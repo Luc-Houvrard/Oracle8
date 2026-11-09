@@ -131,7 +131,16 @@ app.post("/api/questions", verifierToken, async (req: AuthRequest, res) => {
     const [reponses]: any = await pool.query(
       "SELECT Id_Reponse, texte FROM reponse ORDER BY RAND() LIMIT 1",
     );
-    const reponse = reponses[0];
+        const reponse = reponses[0];
+
+        if (!reponse) {
+          return res
+            .status(500)
+            .json({
+              erreur:
+                "Aucune réponse en base. Ajoute des réponses dans la table reponse.",
+            });
+        }
 
     const [result]: any = await pool.query(
       "INSERT INTO question (texte, Id_Reponse, Id_utilisateur) VALUES (?, ?, ?)",
