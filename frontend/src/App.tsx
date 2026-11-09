@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import "./App.css";
 
 const API_URL = "http://localhost:3000";
@@ -28,6 +28,63 @@ function App() {
   const [intensite, setIntensite] = useState(10); // en px
   const [vitesse, setVitesse] = useState(0.3); // en secondes
   const [duree, setDuree] = useState(1200); // en ms
+
+  // Référence vers le champ de question
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  // ---------- Raccourcis clavier ----------
+  // ⚠️ Les hooks doivent être AVANT le "if (!token) return ..."
+  useEffect(() => {
+    // Pas de raccourcis sur la page de connexion
+    if (!token) return;
+
+    const gererTouche = (e: KeyboardEvent) => {
+      const cible = e.target as HTMLElement;
+      const dansUnChamp = ["INPUT", "TEXTAREA", "SELECT"].includes(
+        cible.tagName,
+      );
+
+      // Échap : fonctionne partout
+      if (e.key === "Escape") {
+        setQuestion("");
+        setReponse("");
+        setErreur("");
+        inputRef.current?.blur();
+        return;
+      }
+
+      // Les autres raccourcis sont ignorés si on tape dans un champ
+      if (dansUnChamp || e.ctrlKey || e.altKey || e.metaKey) return;
+
+      switch (e.key) {
+        case "/":
+          e.preventDefault(); // évite d'écrire "/" dans le champ
+          inputRef.current?.focus();
+          break;
+        case "s":
+        case "S":
+          setShakeActif((v) => !v);
+          break;
+        case "ArrowUp":
+          e.preventDefault(); // évite de faire défiler la page
+          setIntensite((v) => Math.min(v + 2, 30));
+          break;
+        case "ArrowDown":
+          e.preventDefault();
+          setIntensite((v) => Math.max(v - 2, 2));
+          break;
+        case "ArrowRight": // plus rapide = durée d'oscillation plus courte
+          setVitesse((v) => Math.max(+(v - 0.05).toFixed(2), 0.1));
+          break;
+        case "ArrowLeft": // plus lent
+          setVitesse((v) => Math.min(+(v + 0.05).toFixed(2), 1));
+          break;
+      }
+    };
+
+    window.addEventListener("keydown", gererTouche);
+    return () => window.removeEventListener("keydown", gererTouche);
+  }, [token]);
 
   const deconnexion = () => {
     localStorage.removeItem("token");
@@ -178,10 +235,11 @@ function App() {
 
       <form onSubmit={poserQuestion}>
         <input
+          ref={inputRef}
           type="text"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="Pose ta question à la boule..."
+          placeholder="Pose ta question à la boule... (raccourci : /)"
         />
         <button type="submit" disabled={chargement}>
           {chargement ? "La boule réfléchit..." : "Demander"}
@@ -217,11 +275,12 @@ function App() {
             checked={shakeActif}
             onChange={(e) => setShakeActif(e.target.checked)}
           />
-          Secousse activée
+          Secousse activée <kbd>S</kbd>
         </label>
 
         <label>
-          Intensité : {intensite}px
+          Intensité : {intensite}px <kbd>↑</kbd>
+          <kbd>↓</kbd>
           <input
             type="range"
             min="2"
@@ -234,7 +293,8 @@ function App() {
         </label>
 
         <label>
-          Vitesse : {vitesse}s
+          Vitesse : {vitesse}s <kbd>←</kbd>
+          <kbd>→</kbd>
           <input
             type="range"
             min="0.1"
@@ -257,6 +317,29 @@ function App() {
             onChange={(e) => setDuree(Number(e.target.value))}
           />
         </label>
+      </div>
+
+      <div className="aide-clavier">
+        <span>
+          <kbd>/</kbd> écrire
+        </span>
+        <span>
+          <kbd>Entrée</kbd> demander
+        </span>
+        <span>
+          <kbd>Échap</kbd> effacer
+        </span>
+        <span>
+          <kbd>S</kbd> shake on/off
+        </span>
+        <span>
+          <kbd>↑</kbd>
+          <kbd>↓</kbd> intensité
+        </span>
+        <span>
+          <kbd>←</kbd>
+          <kbd>→</kbd> vitesse
+        </span>
       </div>
     </div>
   );

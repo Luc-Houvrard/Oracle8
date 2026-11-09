@@ -1,15 +1,19 @@
+import "dotenv/config";
 import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { pool } from "./db";
 
+// ---------- Configuration ----------
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+  throw new Error("JWT_SECRET manquant dans le fichier .env");
+}
+
 const app = express();
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
-
-// ⚠️ À mettre dans un fichier .env plus tard (voir plus bas)
-const JWT_SECRET = process.env.JWT_SECRET || "change_moi_secret_oracle8";
 
 // ---------- Middleware d'authentification ----------
 interface AuthRequest extends Request {
@@ -25,7 +29,7 @@ function verifierToken(req: AuthRequest, res: Response, next: NextFunction) {
   }
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as { id: number };
+    const payload = jwt.verify(token, JWT_SECRET as string) as { id: number };
     req.userId = payload.id;
     next();
   } catch {
@@ -103,7 +107,7 @@ app.post("/api/login", async (req, res) => {
       return res.status(401).json({ erreur: "Identifiants incorrects" });
     }
 
-    const token = jwt.sign({ id: user.Id_utilisateur }, JWT_SECRET, {
+    const token = jwt.sign({ id: user.Id_utilisateur }, JWT_SECRET as string, {
       expiresIn: "2h",
     });
     res.json({ token, pseudo: user.pseudo });
