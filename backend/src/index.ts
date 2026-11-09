@@ -149,6 +149,25 @@ app.post("/api/questions", verifierToken, async (req: AuthRequest, res) => {
   }
 });
 
+// Historique des questions de l'utilisateur connecté
+app.get("/api/questions", verifierToken, async (req: AuthRequest, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT q.Id_question, q.texte AS question, r.texte AS reponse, q.date_creation
+       FROM question q
+       JOIN reponse r ON r.Id_Reponse = q.Id_Reponse
+       WHERE q.Id_utilisateur = ?
+       ORDER BY q.date_creation DESC, q.Id_question DESC
+       LIMIT 50`,
+      [req.userId],
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: "Problème avec la base de données" });
+  }
+});
+
 // Toujours à la fin du fichier
 const PORT = 3000;
 app.listen(PORT, () => {

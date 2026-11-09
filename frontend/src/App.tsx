@@ -3,6 +3,13 @@ import "./App.css";
 
 const API_URL = "http://localhost:3000";
 
+interface Historique {
+  Id_question: number;
+  question: string;
+  reponse: string;
+  date_creation: string;
+}
+
 function App() {
   // ---------- Authentification ----------
   const [token, setToken] = useState<string | null>(
@@ -29,8 +36,49 @@ function App() {
   const [vitesse, setVitesse] = useState(0.3); // en secondes
   const [duree, setDuree] = useState(1200); // en ms
 
+  // ---------- Historique ----------
+  const [historique, setHistorique] = useState<Historique[]>([]);
+  const [afficherHistorique, setAfficherHistorique] = useState(false);
+  const [chargementHisto, setChargementHisto] = useState(false);
+
   // Référence vers le champ de question
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const deconnexion = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("pseudo");
+    setToken(null);
+    setPseudoConnecte(null);
+    setReponse("");
+    setQuestion("");
+    setHistorique([]);
+    setAfficherHistorique(false);
+  };
+
+  const chargerHistorique = async () => {
+    setChargementHisto(true);
+    try {
+      const res = await fetch(`${API_URL}/api/questions`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.status === 401) {
+        deconnexion();
+        setAuthErreur("Ta session a expiré, reconnecte-toi.");
+        return;
+      }
+      if (!res.ok) throw new Error();
+      setHistorique(await res.json());
+    } catch {
+      setErreur("Impossible de charger l'historique.");
+    } finally {
+      setChargementHisto(false);
+    }
+  };
+
+  const basculerHistorique = () => {
+    if (!afficherHistorique) chargerHistorique();
+    setAfficherHistorique((v) => !v);
+  };
 
   // ---------- Raccourcis clavier ----------
   // ⚠️ Les hooks doivent être AVANT le "if (!token) return ..."
@@ -40,60 +88,55 @@ function App() {
 
     const gererTouche = (e: KeyboardEvent) => {
       const cible = e.target as HTMLElement;
-      const dansUnChamp = ["INPUT", "TEXTAREA", "SELECT"].includes(
-        cible.tagName,
-      );
+      const dansChamp =
+        cible.tagName === "INPUT" &&
+        (cible as HTMLInputElement).type === "text";
 
-      // Échap : fonctionne partout
+      // Échap : sortir du champ
       if (e.key === "Escape") {
-        setQuestion("");
-        setReponse("");
-        setErreur("");
         inputRef.current?.blur();
         return;
       }
 
-      // Les autres raccourcis sont ignorés si on tape dans un champ
-      if (dansUnChamp || e.ctrlKey || e.altKey || e.metaKey) return;
+      // Si on tape dans le champ, on ne déclenche pas les raccourcis
+      if (dansChamp) return;
 
       switch (e.key) {
         case "/":
-          e.preventDefault(); // évite d'écrire "/" dans le champ
+          e.preventDefault();
           inputRef.current?.focus();
           break;
         case "s":
         case "S":
           setShakeActif((v) => !v);
           break;
+        case "h":
+        case "H":
+          basculerHistorique();
+          break;
         case "ArrowUp":
-          e.preventDefault(); // évite de faire défiler la page
-          setIntensite((v) => Math.min(v + 2, 30));
+          e.preventDefault();
+          setIntensite((v) => Math.min(30, v + 1));
           break;
         case "ArrowDown":
           e.preventDefault();
-          setIntensite((v) => Math.max(v - 2, 2));
+          setIntensite((v) => Math.max(2, v - 1));
           break;
-        case "ArrowRight": // plus rapide = durée d'oscillation plus courte
-          setVitesse((v) => Math.max(+(v - 0.05).toFixed(2), 0.1));
+        case "ArrowRight":
+          e.preventDefault();
+          setVitesse((v) => Math.min(1, Math.round((v + 0.05) * 100) / 100));
           break;
-        case "ArrowLeft": // plus lent
-          setVitesse((v) => Math.min(+(v + 0.05).toFixed(2), 1));
+        case "ArrowLeft":
+          e.preventDefault();
+          setVitesse((v) => Math.max(0.1, Math.round((v - 0.05) * 100) / 100));
           break;
       }
     };
 
     window.addEventListener("keydown", gererTouche);
     return () => window.removeEventListener("keydown", gererTouche);
-  }, [token]);
-
-  const deconnexion = () => {
-    localStorage.removeItem("token");
-    localStorage.removeItem("pseudo");
-    setToken(null);
-    setPseudoConnecte(null);
-    setReponse("");
-    setQuestion("");
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [token, afficherHistorique]);
 
   const gererAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -163,6 +206,7 @@ function App() {
       setTimeout(() => {
         setReponse(data.reponse);
         setChargement(false);
+        if (afficherHistorique) chargerHistorique();
       }, duree);
     } catch {
       setErreur("La boule ne répond pas... Le serveur est-il lancé ?");
@@ -226,9 +270,15 @@ function App() {
         <span>
           Connecté en tant que <strong>{pseudoConnecte}</strong>
         </span>
-        <button className="lien" onClick={deconnexion}>
-          Se déconnecter
-        </button>
+        <div>
+          <button className="lien" onClick={basculerHistorique}>
+            {afficherHistorique ? "Masquer l'historique" : "Mes questions"}
+          </button>
+          {" · "}
+          <button className="lien" onClick={deconnexion}>
+            Se déconnecter
+          </button>
+        </div>
       </header>
 
       <h1>Oracle8</h1>
@@ -275,12 +325,11 @@ function App() {
             checked={shakeActif}
             onChange={(e) => setShakeActif(e.target.checked)}
           />
-          Secousse activée <kbd>S</kbd>
+          Secousse activée (S)
         </label>
 
         <label>
-          Intensité : {intensite}px <kbd>↑</kbd>
-          <kbd>↓</kbd>
+          Intensité : {intensite}px (↑ ↓)
           <input
             type="range"
             min="2"
@@ -293,8 +342,7 @@ function App() {
         </label>
 
         <label>
-          Vitesse : {vitesse}s <kbd>←</kbd>
-          <kbd>→</kbd>
+          Vitesse : {vitesse}s (← →)
           <input
             type="range"
             min="0.1"
@@ -319,28 +367,26 @@ function App() {
         </label>
       </div>
 
-      <div className="aide-clavier">
-        <span>
-          <kbd>/</kbd> écrire
-        </span>
-        <span>
-          <kbd>Entrée</kbd> demander
-        </span>
-        <span>
-          <kbd>Échap</kbd> effacer
-        </span>
-        <span>
-          <kbd>S</kbd> shake on/off
-        </span>
-        <span>
-          <kbd>↑</kbd>
-          <kbd>↓</kbd> intensité
-        </span>
-        <span>
-          <kbd>←</kbd>
-          <kbd>→</kbd> vitesse
-        </span>
-      </div>
+      {afficherHistorique && (
+        <section className="historique">
+          <h2>Mes questions</h2>
+          {chargementHisto && <p>Chargement...</p>}
+          {!chargementHisto && historique.length === 0 && (
+            <p>Tu n'as encore posé aucune question.</p>
+          )}
+          <ul>
+            {historique.map((h) => (
+              <li key={h.Id_question}>
+                <span className="histo-date">
+                  {new Date(h.date_creation).toLocaleString("fr-FR")}
+                </span>
+                <p className="histo-question">❓ {h.question}</p>
+                <p className="histo-reponse">🎱 {h.reponse}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
     </div>
   );
 }
