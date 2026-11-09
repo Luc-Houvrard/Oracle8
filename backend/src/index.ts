@@ -1,18 +1,41 @@
-import express from "express";
+import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
 import { pool } from "./db";
 
 const app = express();
 app.use(cors({ origin: "http://localhost:5173" }));
 app.use(express.json());
 
+// ⚠️ À mettre dans un fichier .env plus tard (voir plus bas)
+const JWT_SECRET = process.env.JWT_SECRET || "change_moi_secret_oracle8";
+
+// ---------- Middleware d'authentification ----------
+interface AuthRequest extends Request {
+  userId?: number;
+}
+
+function verifierToken(req: AuthRequest, res: Response, next: NextFunction) {
+  const header = req.headers.authorization; // "Bearer xxxxx"
+  const token = header?.split(" ")[1];
+
+  if (!token) {
+    return res.status(401).json({ erreur: "Tu dois être connecté" });
+  }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET) as { id: number };
+    req.userId = payload.id;
+    next();
+  } catch {
+    return res.status(401).json({ erreur: "Token invalide ou expiré" });
+  }
+}
+
+// ---------- Routes ----------
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
-});
-
-const PORT = 3000;
-app.listen(PORT, () => {
-  console.log(`Serveur lancé sur http://localhost:${PORT}`);
 });
 
 app.get("/api/reponses", async (_req, res) => {
@@ -25,30 +48,92 @@ app.get("/api/reponses", async (_req, res) => {
   }
 });
 
+// Inscription
+app.post("/api/register", async (req, res) => {
+  const { pseudo, motdepasse } = req.body;
 
-app.post("/api/questions", async (req, res) => {
-  const { texte, Id_utilisateur } = req.body;
-
-  if (!texte || !Id_utilisateur) {
+  if (!pseudo || !motdepasse) {
     return res
       .status(400)
-      .json({ erreur: "texte et Id_utilisateur sont obligatoires" });
+      .json({ erreur: "Pseudo et mot de passe obligatoires" });
+  }
+  if (motdepasse.length < 8) {
+    return res
+      .status(400)
+      .json({ erreur: "Le mot de passe doit faire au moins 8 caractères" });
   }
 
   try {
-    // 1. Tirer une réponse au hasard
+    const hash = await bcrypt.hash(motdepasse, 10);
+    const [result]: any = await pool.query(
+      "INSERT INTO utilisateur (pseudo, motdepasse) VALUES (?, ?)",
+      [pseudo, hash],
+    );
+    res
+      .status(201)
+      .json({ message: "Compte créé", Id_utilisateur: result.insertId });
+  } catch (err: any) {
+    if (err.code === "ER_DUP_ENTRY") {
+      return res.status(409).json({ erreur: "Ce pseudo est déjà pris" });
+    }
+    console.error(err);
+    res.status(500).json({ erreur: "Problème avec la base de données" });
+  }
+});
+
+// Connexion
+app.post("/api/login", async (req, res) => {
+  const { pseudo, motdepasse } = req.body;
+
+  if (!pseudo || !motdepasse) {
+    return res
+      .status(400)
+      .json({ erreur: "Pseudo et mot de passe obligatoires" });
+  }
+
+  try {
+    const [rows]: any = await pool.query(
+      "SELECT Id_utilisateur, pseudo, motdepasse FROM utilisateur WHERE pseudo = ?",
+      [pseudo],
+    );
+    const user = rows[0];
+
+    // Même message dans les deux cas : on ne révèle pas si le pseudo existe
+    if (!user || !(await bcrypt.compare(motdepasse, user.motdepasse))) {
+      return res.status(401).json({ erreur: "Identifiants incorrects" });
+    }
+
+    const token = jwt.sign({ id: user.Id_utilisateur }, JWT_SECRET, {
+      expiresIn: "2h",
+    });
+    res.json({ token, pseudo: user.pseudo });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: "Problème avec la base de données" });
+  }
+});
+
+// Poser une question (protégé : l'id vient du token, plus du body)
+app.post("/api/questions", verifierToken, async (req: AuthRequest, res) => {
+  const { texte } = req.body;
+
+  if (!texte) {
+    return res
+      .status(400)
+      .json({ erreur: "Le texte de la question est obligatoire" });
+  }
+
+  try {
     const [reponses]: any = await pool.query(
       "SELECT Id_Reponse, texte FROM reponse ORDER BY RAND() LIMIT 1",
     );
     const reponse = reponses[0];
 
-    // 2. Enregistrer la question
     const [result]: any = await pool.query(
       "INSERT INTO question (texte, Id_Reponse, Id_utilisateur) VALUES (?, ?, ?)",
-      [texte, reponse.Id_Reponse, Id_utilisateur],
+      [texte, reponse.Id_Reponse, req.userId],
     );
 
-    // 3. Renvoyer la réponse au front
     res.status(201).json({
       Id_question: result.insertId,
       question: texte,
@@ -58,4 +143,10 @@ app.post("/api/questions", async (req, res) => {
     console.error(err);
     res.status(500).json({ erreur: "Problème avec la base de données" });
   }
+});
+
+// Toujours à la fin du fichier
+const PORT = 3000;
+app.listen(PORT, () => {
+  console.log(`Serveur lancé sur http://localhost:${PORT}`);
 });

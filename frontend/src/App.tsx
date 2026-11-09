@@ -4,17 +4,76 @@ import "./App.css";
 const API_URL = "http://localhost:3000";
 
 function App() {
-  // État de la boule
+  // ---------- Authentification ----------
+  const [token, setToken] = useState<string | null>(
+    localStorage.getItem("token"),
+  );
+  const [pseudoConnecte, setPseudoConnecte] = useState<string | null>(
+    localStorage.getItem("pseudo"),
+  );
+  const [modeInscription, setModeInscription] = useState(false);
+  const [pseudo, setPseudo] = useState("");
+  const [motdepasse, setMotdepasse] = useState("");
+  const [authErreur, setAuthErreur] = useState("");
+  const [authMessage, setAuthMessage] = useState("");
+
+  // ---------- État de la boule ----------
   const [question, setQuestion] = useState("");
   const [reponse, setReponse] = useState("");
   const [chargement, setChargement] = useState(false);
   const [erreur, setErreur] = useState("");
 
-  // Réglages du shake
+  // ---------- Réglages du shake ----------
   const [shakeActif, setShakeActif] = useState(true);
   const [intensite, setIntensite] = useState(10); // en px
   const [vitesse, setVitesse] = useState(0.3); // en secondes
   const [duree, setDuree] = useState(1200); // en ms
+
+  const deconnexion = () => {
+    localStorage.removeItem("token");
+    localStorage.removeItem("pseudo");
+    setToken(null);
+    setPseudoConnecte(null);
+    setReponse("");
+    setQuestion("");
+  };
+
+  const gererAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAuthErreur("");
+    setAuthMessage("");
+
+    const route = modeInscription ? "register" : "login";
+
+    try {
+      const res = await fetch(`${API_URL}/api/${route}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pseudo, motdepasse }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setAuthErreur(data.erreur || "Erreur inconnue");
+        return;
+      }
+
+      if (modeInscription) {
+        setAuthMessage("Compte créé ! Tu peux te connecter.");
+        setModeInscription(false);
+        setMotdepasse("");
+      } else {
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("pseudo", data.pseudo);
+        setToken(data.token);
+        setPseudoConnecte(data.pseudo);
+        setPseudo("");
+        setMotdepasse("");
+      }
+    } catch {
+      setAuthErreur("Impossible de joindre le serveur. Est-il lancé ?");
+    }
+  };
 
   const poserQuestion = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -27,9 +86,20 @@ function App() {
     try {
       const res = await fetch(`${API_URL}/api/questions`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ texte: question, Id_utilisateur: 1 }),
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ texte: question }),
       });
+
+      // Token expiré ou invalide -> retour à la connexion
+      if (res.status === 401) {
+        deconnexion();
+        setAuthErreur("Ta session a expiré, reconnecte-toi.");
+        setChargement(false);
+        return;
+      }
       if (!res.ok) throw new Error();
       const data = await res.json();
 
@@ -43,8 +113,67 @@ function App() {
     }
   };
 
+  // ---------- Page de connexion / inscription ----------
+  if (!token) {
+    return (
+      <div className="app">
+        <h1>Oracle8</h1>
+
+        <form className="auth" onSubmit={gererAuth}>
+          <h2>{modeInscription ? "Créer un compte" : "Connexion"}</h2>
+          <input
+            type="text"
+            value={pseudo}
+            onChange={(e) => setPseudo(e.target.value)}
+            placeholder="Pseudo"
+            maxLength={50}
+            required
+          />
+          <input
+            type="password"
+            value={motdepasse}
+            onChange={(e) => setMotdepasse(e.target.value)}
+            placeholder="Mot de passe (8 caractères min.)"
+            required
+          />
+          <button type="submit">
+            {modeInscription ? "S'inscrire" : "Se connecter"}
+          </button>
+
+          {authErreur && <p className="erreur">{authErreur}</p>}
+          {authMessage && <p className="succes">{authMessage}</p>}
+
+          <p className="bascule">
+            {modeInscription ? "Déjà un compte ?" : "Pas encore de compte ?"}{" "}
+            <button
+              type="button"
+              className="lien"
+              onClick={() => {
+                setModeInscription(!modeInscription);
+                setAuthErreur("");
+                setAuthMessage("");
+              }}
+            >
+              {modeInscription ? "Se connecter" : "Créer un compte"}
+            </button>
+          </p>
+        </form>
+      </div>
+    );
+  }
+
+  // ---------- Page de la boule ----------
   return (
     <div className="app">
+      <header className="entete">
+        <span>
+          Connecté en tant que <strong>{pseudoConnecte}</strong>
+        </span>
+        <button className="lien" onClick={deconnexion}>
+          Se déconnecter
+        </button>
+      </header>
+
       <h1>Oracle8</h1>
 
       <form onSubmit={poserQuestion}>
