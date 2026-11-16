@@ -3,6 +3,7 @@ import express, { Request, Response, NextFunction } from "express";
 import cors from "cors";
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
+import rateLimit from "express-rate-limit";
 import { pool } from "./db";
 
 // ---------- Configuration ----------
@@ -37,6 +38,30 @@ function verifierToken(req: AuthRequest, res: Response, next: NextFunction) {
   }
 }
 
+// ---------- Limite de tentatives (par adresse IP) ----------
+// ponytail: compteurs en mémoire, remis à zéro au redémarrage et propres à un seul
+// processus. Passer à un store partagé (Redis) si le serveur tourne en plusieurs instances.
+// Derrière un reverse proxy, régler aussi app.set("trust proxy", ...) pour voir la vraie IP.
+const QUINZE_MINUTES = 15 * 60 * 1000;
+const tropDeTentatives = {
+  erreur: "Trop de tentatives. Réessaie dans quelques minutes.",
+};
+
+// Connexion : 10 échecs maximum par quart d'heure (les connexions réussies ne comptent pas)
+const limiteLogin = rateLimit({
+  windowMs: QUINZE_MINUTES,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  message: tropDeTentatives,
+});
+
+// Inscription : 10 demandes maximum par quart d'heure
+const limiteRegister = rateLimit({
+  windowMs: QUINZE_MINUTES,
+  limit: 10,
+  message: tropDeTentatives,
+});
+
 // ---------- Validation ----------
 // Vrai si v est un texte non vide d'au plus `max` caractères
 function estTexte(v: unknown, max: number): v is string {
@@ -59,7 +84,7 @@ app.get("/api/reponses", async (_req, res) => {
 });
 
 // Inscription
-app.post("/api/register", async (req, res) => {
+app.post("/api/register", limiteRegister, async (req, res) => {
   const { pseudo, motdepasse } = req.body ?? {};
 
   if (!pseudo || !motdepasse) {
@@ -103,7 +128,7 @@ app.post("/api/register", async (req, res) => {
 });
 
 // Connexion
-app.post("/api/login", async (req, res) => {
+app.post("/api/login", limiteLogin, async (req, res) => {
   const { pseudo, motdepasse } = req.body ?? {};
 
   if (!pseudo || !motdepasse) {
