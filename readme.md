@@ -18,7 +18,7 @@ Projet full-stack : **React + TypeScript** pour le front, **Node.js + Express + 
 | Partie   | Technologies                                    |
 |----------|-------------------------------------------------|
 | Frontend | React, TypeScript, Vite                         |
-| Backend  | Node.js, Express, TypeScript, ts-node-dev       |
+| Backend  | Node.js, Express, TypeScript, tsx               |
 | Base     | MySQL (mysql2)                                  |
 | Sécurité | bcrypt, jsonwebtoken, dotenv, cors              |
 
@@ -28,7 +28,8 @@ Projet full-stack : **React + TypeScript** pour le front, **Node.js + Express + 
 Oracle8/
 ├── backend/
 │   ├── database/
-│   │   └── schema.sql      # Création des tables
+│   │   ├── schema.sql      # Création des tables
+│   │   └── seed.sql        # Réponses de départ de la boule
 │   ├── src/
 │   │   ├── index.ts        # Serveur Express et routes
 │   │   └── db.ts           # Connexion MySQL
@@ -39,7 +40,7 @@ Oracle8/
 │   │   ├── App.tsx
 │   │   └── App.css
 │   └── package.json
-└── README.md
+└── readme.md
 ```
 
 ## ✅ Prérequis
@@ -53,25 +54,37 @@ Oracle8/
 ### 1. Cloner le projet
 
 ```bash
-git clone https://github.com/<ton-pseudo>/Oracle8.git
+git clone https://github.com/Luc-Houvrard/Oracle8.git
 cd Oracle8
 ```
 
 ### 2. Base de données
 
-Crée la base, puis importe le schéma :
+Crée la base :
 
 ```sql
 CREATE DATABASE oracle8 CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
+Importe ensuite le schéma, puis les réponses de départ.
+
 Dans PowerShell :
 
 ```powershell
 Get-Content backend/database/schema.sql | mysql -u root -p oracle8
+Get-Content backend/database/seed.sql | mysql -u root -p oracle8
 ```
 
-Ensuite, ajoute des réponses dans la table `reponse`. Par exemple :
+Sous Linux ou macOS :
+
+```bash
+mysql -u root -p oracle8 < backend/database/schema.sql
+mysql -u root -p oracle8 < backend/database/seed.sql
+```
+
+> ⚠️ `schema.sql` supprime les tables existantes avant de les recréer : le réimporter efface les comptes et les questions.
+
+Sans `seed.sql`, la table `reponse` est vide et la boule ne peut pas répondre. Tu peux aussi y ajouter tes propres réponses :
 
 ```sql
 INSERT INTO reponse (texte) VALUES ('Oui.'), ('Non.'), ('Redemande plus tard.');
@@ -123,8 +136,15 @@ Ouvre ensuite http://localhost:5173.
 | POST    | `/api/register`  | ❌   | Inscription `{ pseudo, motdepasse }`|
 | POST    | `/api/login`     | ❌   | Connexion, renvoie un token JWT     |
 | POST    | `/api/questions` | ✅   | Pose une question `{ texte }`       |
+| GET     | `/api/questions` | ✅   | Historique : tes 50 dernières questions |
 
-Les routes protégées demandent cet en-tête : `Authorization: Bearer <token>`.
+Les routes protégées demandent cet en-tête : `Authorization: Bearer <token>`. Le token expire au bout de 2 heures.
+
+Limites des champs (au-delà, l'API répond `400`) :
+
+- `pseudo` : 1 à 50 caractères
+- `motdepasse` : 8 caractères minimum, 72 octets maximum
+- `texte` : 1 à 500 caractères
 
 ## 🗄️ Modèle de données
 
