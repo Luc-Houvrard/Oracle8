@@ -10,6 +10,7 @@ CREATE TABLE utilisateur(
    Id_utilisateur INT AUTO_INCREMENT,
    pseudo VARCHAR(50) NOT NULL,
    motdepasse VARCHAR(255) NOT NULL,
+   role ENUM('user', 'admin') NOT NULL DEFAULT 'user',
    PRIMARY KEY(Id_utilisateur),
    UNIQUE(pseudo)
 );

@@ -143,7 +143,7 @@ app.post("/api/login", limiteLogin, async (req, res) => {
 
   try {
     const [rows]: any = await pool.query(
-      "SELECT Id_utilisateur, pseudo, motdepasse FROM utilisateur WHERE pseudo = ?",
+      "SELECT Id_utilisateur, pseudo, motdepasse, role FROM utilisateur WHERE pseudo = ?",
       [pseudo],
     );
     const user = rows[0];
@@ -156,7 +156,9 @@ app.post("/api/login", limiteLogin, async (req, res) => {
     const token = jwt.sign({ id: user.Id_utilisateur }, JWT_SECRET as string, {
       expiresIn: "2h",
     });
-    res.json({ token, pseudo: user.pseudo });
+    // Le rôle sert seulement à afficher le lien "Administration" :
+    // les routes /api/admin le revérifient en base à chaque requête
+    res.json({ token, pseudo: user.pseudo, role: user.role });
   } catch (err) {
     console.error(err);
     res.status(500).json({ erreur: "Problème avec la base de données" });
@@ -203,7 +205,11 @@ app.post("/api/questions", verifierToken, async (req: AuthRequest, res) => {
       question: texte,
       reponse: reponse.texte,
     });
-  } catch (err) {
+  } catch (err: any) {
+    // Le token est encore valide mais le compte a été supprimé par un admin
+    if (err.code === "ER_NO_REFERENCED_ROW_2") {
+      return res.status(401).json({ erreur: "Ce compte n'existe plus" });
+    }
     console.error(err);
     res.status(500).json({ erreur: "Problème avec la base de données" });
   }
@@ -228,8 +234,164 @@ app.get("/api/questions", verifierToken, async (req: AuthRequest, res) => {
   }
 });
 
+// ---------- Administration ----------
+// Le rôle est relu en base à chaque requête (et pas stocké dans le token) :
+// retirer le rôle admin à quelqu'un prend effet tout de suite.
+async function verifierAdmin(
+  req: AuthRequest,
+  res: Response,
+  next: NextFunction,
+) {
+  try {
+    const [rows]: any = await pool.query(
+      "SELECT role FROM utilisateur WHERE Id_utilisateur = ?",
+      [req.userId],
+    );
+    if (rows[0]?.role !== "admin") {
+      return res
+        .status(403)
+        .json({ erreur: "Accès réservé aux administrateurs" });
+    }
+    next();
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: "Problème avec la base de données" });
+  }
+}
+
+// Toutes les routes /api/admin demandent un token valide ET le rôle admin
+app.use("/api/admin", verifierToken, verifierAdmin);
+
+// Renvoie l'identifiant de l'URL s'il est un entier positif, sinon null
+function lireId(v: unknown): number | null {
+  const id = Number(v);
+  return Number.isInteger(id) && id > 0 ? id : null;
+}
+
+const TEXTE_REPONSE_INVALIDE = {
+  erreur: "La réponse doit faire entre 1 et 200 caractères",
+};
+
+// Ajouter une réponse
+app.post("/api/admin/reponses", async (req, res) => {
+  const { texte } = req.body ?? {};
+  if (!estTexte(texte, 200)) {
+    return res.status(400).json(TEXTE_REPONSE_INVALIDE);
+  }
+
+  try {
+    const [result]: any = await pool.query(
+      "INSERT INTO reponse (texte) VALUES (?)",
+      [texte],
+    );
+    res.status(201).json({ Id_Reponse: result.insertId, texte });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: "Problème avec la base de données" });
+  }
+});
+
+// Modifier une réponse
+app.put("/api/admin/reponses/:id", async (req, res) => {
+  const id = lireId(req.params.id);
+  const { texte } = req.body ?? {};
+  if (!id) {
+    return res.status(400).json({ erreur: "Identifiant invalide" });
+  }
+  if (!estTexte(texte, 200)) {
+    return res.status(400).json(TEXTE_REPONSE_INVALIDE);
+  }
+
+  try {
+    const [result]: any = await pool.query(
+      "UPDATE reponse SET texte = ? WHERE Id_Reponse = ?",
+      [texte, id],
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ erreur: "Réponse introuvable" });
+    }
+    res.json({ Id_Reponse: id, texte });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: "Problème avec la base de données" });
+  }
+});
+
+// Supprimer une réponse
+app.delete("/api/admin/reponses/:id", async (req, res) => {
+  const id = lireId(req.params.id);
+  if (!id) {
+    return res.status(400).json({ erreur: "Identifiant invalide" });
+  }
+
+  try {
+    const [result]: any = await pool.query(
+      "DELETE FROM reponse WHERE Id_Reponse = ?",
+      [id],
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ erreur: "Réponse introuvable" });
+    }
+    res.json({ message: "Réponse supprimée" });
+  } catch (err: any) {
+    // La clé étrangère de la table question protège l'historique des utilisateurs
+    if (err.code === "ER_ROW_IS_REFERENCED_2") {
+      return res.status(409).json({
+        erreur:
+          "Cette réponse apparaît dans l'historique : modifie-la au lieu de la supprimer",
+      });
+    }
+    console.error(err);
+    res.status(500).json({ erreur: "Problème avec la base de données" });
+  }
+});
+
+// Lister les utilisateurs (sans les mots de passe)
+app.get("/api/admin/utilisateurs", async (_req, res) => {
+  try {
+    const [rows] = await pool.query(
+      `SELECT u.Id_utilisateur, u.pseudo, u.role, COUNT(q.Id_question) AS nb_questions
+       FROM utilisateur u
+       LEFT JOIN question q ON q.Id_utilisateur = u.Id_utilisateur
+       GROUP BY u.Id_utilisateur
+       ORDER BY u.pseudo`,
+    );
+    res.json(rows);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: "Problème avec la base de données" });
+  }
+});
+
+// Supprimer un utilisateur (ses questions partent avec lui : ON DELETE CASCADE)
+app.delete("/api/admin/utilisateurs/:id", async (req: AuthRequest, res) => {
+  const id = lireId(req.params.id);
+  if (!id) {
+    return res.status(400).json({ erreur: "Identifiant invalide" });
+  }
+  if (id === req.userId) {
+    return res
+      .status(400)
+      .json({ erreur: "Tu ne peux pas supprimer ton propre compte" });
+  }
+
+  try {
+    const [result]: any = await pool.query(
+      "DELETE FROM utilisateur WHERE Id_utilisateur = ?",
+      [id],
+    );
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ erreur: "Utilisateur introuvable" });
+    }
+    res.json({ message: "Utilisateur supprimé" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ erreur: "Problème avec la base de données" });
+  }
+});
+
 // Toujours à la fin du fichier
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, () => {
   console.log(`Serveur lancé sur http://localhost:${PORT}`);
 });

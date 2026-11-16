@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import Admin from "./Admin";
 import "./App.css";
 
 const API_URL = "http://localhost:3000";
@@ -18,6 +19,9 @@ function App() {
   const [pseudoConnecte, setPseudoConnecte] = useState<string | null>(
     localStorage.getItem("pseudo"),
   );
+  // Sert uniquement à afficher le lien "Administration" : le serveur revérifie le rôle
+  const [role, setRole] = useState<string | null>(localStorage.getItem("role"));
+  const [afficherAdmin, setAfficherAdmin] = useState(false);
   const [modeInscription, setModeInscription] = useState(false);
   const [pseudo, setPseudo] = useState("");
   const [motdepasse, setMotdepasse] = useState("");
@@ -47,8 +51,11 @@ function App() {
   const deconnexion = () => {
     localStorage.removeItem("token");
     localStorage.removeItem("pseudo");
+    localStorage.removeItem("role");
     setToken(null);
     setPseudoConnecte(null);
+    setRole(null);
+    setAfficherAdmin(false);
     setReponse("");
     setQuestion("");
     setHistorique([]);
@@ -83,8 +90,8 @@ function App() {
   // ---------- Raccourcis clavier ----------
   // ⚠️ Les hooks doivent être AVANT le "if (!token) return ..."
   useEffect(() => {
-    // Pas de raccourcis sur la page de connexion
-    if (!token) return;
+    // Pas de raccourcis sur la page de connexion ni dans l'administration
+    if (!token || afficherAdmin) return;
 
     const gererTouche = (e: KeyboardEvent) => {
       const cible = e.target as HTMLElement;
@@ -136,7 +143,7 @@ function App() {
     window.addEventListener("keydown", gererTouche);
     return () => window.removeEventListener("keydown", gererTouche);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [token, afficherHistorique]);
+  }, [token, afficherHistorique, afficherAdmin]);
 
   const gererAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -165,8 +172,10 @@ function App() {
       } else {
         localStorage.setItem("token", data.token);
         localStorage.setItem("pseudo", data.pseudo);
+        localStorage.setItem("role", data.role);
         setToken(data.token);
         setPseudoConnecte(data.pseudo);
+        setRole(data.role);
         setPseudo("");
         setMotdepasse("");
       }
@@ -263,23 +272,54 @@ function App() {
     );
   }
 
+  // ---------- En-tête commun à la boule et à l'administration ----------
+  const entete = (
+    <header className="entete">
+      <span>
+        Connecté en tant que <strong>{pseudoConnecte}</strong>
+      </span>
+      <div>
+        {!afficherAdmin && (
+          <>
+            <button className="lien" onClick={basculerHistorique}>
+              {afficherHistorique ? "Masquer l'historique" : "Mes questions"}
+            </button>
+            {" · "}
+          </>
+        )}
+        {role === "admin" && (
+          <>
+            <button
+              className="lien"
+              onClick={() => setAfficherAdmin((v) => !v)}
+            >
+              {afficherAdmin ? "Retour à la boule" : "Administration"}
+            </button>
+            {" · "}
+          </>
+        )}
+        <button className="lien" onClick={deconnexion}>
+          Se déconnecter
+        </button>
+      </div>
+    </header>
+  );
+
+  // ---------- Page d'administration ----------
+  if (afficherAdmin) {
+    return (
+      <div className="app">
+        {entete}
+        <h1>Oracle8</h1>
+        <Admin apiUrl={API_URL} token={token} monPseudo={pseudoConnecte} />
+      </div>
+    );
+  }
+
   // ---------- Page de la boule ----------
   return (
     <div className="app">
-      <header className="entete">
-        <span>
-          Connecté en tant que <strong>{pseudoConnecte}</strong>
-        </span>
-        <div>
-          <button className="lien" onClick={basculerHistorique}>
-            {afficherHistorique ? "Masquer l'historique" : "Mes questions"}
-          </button>
-          {" · "}
-          <button className="lien" onClick={deconnexion}>
-            Se déconnecter
-          </button>
-        </div>
-      </header>
+      {entete}
 
       <h1>Oracle8</h1>
 

@@ -11,6 +11,7 @@ Projet full-stack : **React + TypeScript** pour le front, **Node.js + Express + 
 - Secousse de la boule réglable (activation, intensité, vitesse, durée)
 - Raccourcis clavier
 - Historique des questions
+- Administration : gestion des réponses de la boule et des utilisateurs (rôle `admin`)
 - Gestion des accents et des emojis (UTF-8 / `utf8mb4`)
 
 ## 🛠️ Technologies
@@ -29,6 +30,7 @@ Oracle8/
 ├── backend/
 │   ├── database/
 │   │   ├── schema.sql      # Création des tables
+│   │   ├── migration_001_role.sql  # Ajout du rôle sur une base existante
 │   │   └── seed.sql        # Réponses de départ de la boule
 │   ├── src/
 │   │   ├── index.ts        # Serveur Express et routes
@@ -37,7 +39,8 @@ Oracle8/
 │   └── package.json
 ├── frontend/
 │   ├── src/
-│   │   ├── App.tsx
+│   │   ├── App.tsx         # Connexion et boule
+│   │   ├── Admin.tsx       # Page d'administration
 │   │   └── App.css
 │   └── package.json
 └── readme.md
@@ -127,6 +130,25 @@ npm run dev
 
 Ouvre ensuite http://localhost:5173.
 
+## 🛡️ Administration
+
+Un compte a le rôle `user` par défaut. Il n'existe volontairement aucune route pour se donner le rôle `admin` : il s'attribue directement en base.
+
+```sql
+UPDATE utilisateur SET role = 'admin' WHERE pseudo = 'ton_pseudo';
+```
+
+Reconnecte-toi ensuite : le lien **Administration** apparaît en haut de la page. Un administrateur peut :
+
+- ajouter, modifier et supprimer les réponses de la boule (une réponse déjà présente dans l'historique ne peut qu'être modifiée) ;
+- voir la liste des utilisateurs et supprimer un compte, avec ses questions (pas le sien).
+
+Si ta base a été créée avant l'ajout de l'administration, ajoute la colonne `role` sans perdre tes données :
+
+```bash
+mysql -u root -p oracle8 < backend/database/migration_001_role.sql
+```
+
 ## 🔌 Routes de l'API
 
 | Méthode | Route            | Auth | Description                         |
@@ -137,6 +159,13 @@ Ouvre ensuite http://localhost:5173.
 | POST    | `/api/login`     | ❌   | Connexion, renvoie un token JWT     |
 | POST    | `/api/questions` | ✅   | Pose une question `{ texte }`       |
 | GET     | `/api/questions` | ✅   | Historique : tes 50 dernières questions |
+| POST    | `/api/admin/reponses` | 🛡️ | Ajoute une réponse `{ texte }` |
+| PUT     | `/api/admin/reponses/:id` | 🛡️ | Modifie une réponse `{ texte }` |
+| DELETE  | `/api/admin/reponses/:id` | 🛡️ | Supprime une réponse (`409` si elle est dans l'historique) |
+| GET     | `/api/admin/utilisateurs` | 🛡️ | Liste les utilisateurs et leur nombre de questions |
+| DELETE  | `/api/admin/utilisateurs/:id` | 🛡️ | Supprime un utilisateur et ses questions |
+
+🛡️ = token d'un compte `admin` obligatoire (`401` sans token, `403` sans le rôle).
 
 Les routes protégées demandent cet en-tête : `Authorization: Bearer <token>`. Le token expire au bout de 2 heures.
 
@@ -144,11 +173,12 @@ Limites des champs (au-delà, l'API répond `400`) :
 
 - `pseudo` : 1 à 50 caractères
 - `motdepasse` : 8 caractères minimum, 72 octets maximum
-- `texte` : 1 à 500 caractères
+- `texte` d'une question : 1 à 500 caractères
+- `texte` d'une réponse : 1 à 200 caractères
 
 ## 🗄️ Modèle de données
 
-- **utilisateur** (`Id_utilisateur`, `pseudo` unique, `motdepasse` haché)
+- **utilisateur** (`Id_utilisateur`, `pseudo` unique, `motdepasse` haché, `role` : `user` ou `admin`)
 - **reponse** (`Id_Reponse`, `texte`)
 - **question** (`Id_question`, `texte`, `Id_Reponse` → reponse, `Id_utilisateur` → utilisateur)
 
