@@ -37,6 +37,12 @@ function verifierToken(req: AuthRequest, res: Response, next: NextFunction) {
   }
 }
 
+// ---------- Validation ----------
+// Vrai si v est un texte non vide d'au plus `max` caractères
+function estTexte(v: unknown, max: number): v is string {
+  return typeof v === "string" && v.trim().length > 0 && v.length <= max;
+}
+
 // ---------- Routes ----------
 app.get("/api/health", (_req, res) => {
   res.json({ status: "ok" });
@@ -54,17 +60,28 @@ app.get("/api/reponses", async (_req, res) => {
 
 // Inscription
 app.post("/api/register", async (req, res) => {
-  const { pseudo, motdepasse } = req.body;
+  const { pseudo, motdepasse } = req.body ?? {};
 
   if (!pseudo || !motdepasse) {
     return res
       .status(400)
       .json({ erreur: "Pseudo et mot de passe obligatoires" });
   }
-  if (motdepasse.length < 8) {
+  if (!estTexte(pseudo, 50)) {
+    return res
+      .status(400)
+      .json({ erreur: "Le pseudo doit faire entre 1 et 50 caractères" });
+  }
+  if (typeof motdepasse !== "string" || motdepasse.length < 8) {
     return res
       .status(400)
       .json({ erreur: "Le mot de passe doit faire au moins 8 caractères" });
+  }
+  // bcrypt ignore tout ce qui dépasse 72 octets : on refuse plutôt que de tronquer en silence
+  if (Buffer.byteLength(motdepasse) > 72) {
+    return res
+      .status(400)
+      .json({ erreur: "Le mot de passe est trop long (72 octets max.)" });
   }
 
   try {
@@ -87,12 +104,16 @@ app.post("/api/register", async (req, res) => {
 
 // Connexion
 app.post("/api/login", async (req, res) => {
-  const { pseudo, motdepasse } = req.body;
+  const { pseudo, motdepasse } = req.body ?? {};
 
   if (!pseudo || !motdepasse) {
     return res
       .status(400)
       .json({ erreur: "Pseudo et mot de passe obligatoires" });
+  }
+  // Un pseudo ou un mot de passe mal formé ne peut correspondre à aucun compte
+  if (!estTexte(pseudo, 50) || typeof motdepasse !== "string") {
+    return res.status(401).json({ erreur: "Identifiants incorrects" });
   }
 
   try {
@@ -119,12 +140,17 @@ app.post("/api/login", async (req, res) => {
 
 // Poser une question (protégé : l'id vient du token, plus du body)
 app.post("/api/questions", verifierToken, async (req: AuthRequest, res) => {
-  const { texte } = req.body;
+  const { texte } = req.body ?? {};
 
   if (!texte) {
     return res
       .status(400)
       .json({ erreur: "Le texte de la question est obligatoire" });
+  }
+  if (!estTexte(texte, 500)) {
+    return res
+      .status(400)
+      .json({ erreur: "La question doit faire entre 1 et 500 caractères" });
   }
 
   try {

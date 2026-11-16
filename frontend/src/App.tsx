@@ -290,6 +290,7 @@ function App() {
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
           placeholder="Pose ta question à la boule... (raccourci : /)"
+          maxLength={500}
         />
         <button type="submit" disabled={chargement}>
           {chargement ? "La boule réfléchit..." : "Demander"}
