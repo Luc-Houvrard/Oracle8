@@ -1,0 +1,7 @@
+# Fichiers que Docker ne copie JAMAIS dans le conteneur
+node_modules
+dist
+# La configuration est donnée par docker-compose.yml (VITE_API_URL)
+.env
+.env.*
+!.env.example

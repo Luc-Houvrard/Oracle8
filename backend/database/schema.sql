@@ -1,4 +1,6 @@
 USE oracle8;
+-- Ce fichier est en UTF-8 : sans cette ligne, les accents peuvent être lus de travers
+SET NAMES utf8mb4;
 
 -- On supprime d'abord les anciennes tables si elles existent (dans l'ordre inverse)
 DROP TABLE IF EXISTS question;

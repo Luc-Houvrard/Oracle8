@@ -1,0 +1,72 @@
+# Lance toute l'application Oracle8 avec une seule commande :
+#   sudo docker compose up --build
+# Puis ouvre http://localhost:8080
+#
+# Les secrets (DB_PASSWORD, JWT_SECRET) viennent du fichier .env à la racine du projet
+# (copie .env.example). Docker Compose le lit automatiquement.
+
+services:
+  # ---------- Base de données ----------
+  db:
+    image: mysql:8.4
+    environment:
+      MYSQL_DATABASE: oracle8
+      # L'application n'utilise pas le compte root : elle a son propre compte "oracle8",
+      # qui n'a des droits que sur la base oracle8
+      MYSQL_USER: oracle8
+      MYSQL_PASSWORD: ${DB_PASSWORD:?Définis DB_PASSWORD dans le fichier .env}
+      # Mot de passe root tiré au hasard : personne ne s'en sert
+      MYSQL_RANDOM_ROOT_PASSWORD: "yes"
+    volumes:
+      # Les données sont gardées dans un volume : elles survivent à l'arrêt du conteneur
+      - donnees-mysql:/var/lib/mysql
+      # Au TOUT PREMIER démarrage (volume vide), MySQL exécute ces fichiers dans l'ordre
+      - ./backend/database/schema.sql:/docker-entrypoint-initdb.d/1-schema.sql:ro
+      - ./backend/database/seed.sql:/docker-entrypoint-initdb.d/2-seed.sql:ro
+    # Pas de "ports" : la base n'est joignable que par le backend, pas depuis l'extérieur
+    healthcheck:
+      # "La base est prête ?" Docker pose la question toutes les 5 s.
+      # 127.0.0.1 (et pas localhost) : on attend le vrai serveur, pas celui
+      # qui tourne pendant l'import de schema.sql. $$ = variable lue dans le conteneur.
+      test: ["CMD-SHELL", "mysqladmin ping -h 127.0.0.1 -u$$MYSQL_USER -p$$MYSQL_PASSWORD --silent"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  # ---------- Backend (API) ----------
+  backend:
+    build: ./backend
+    environment:
+      DB_HOST: db # le nom du service ci-dessus sert d'adresse sur le réseau Docker
+      DB_USER: oracle8
+      DB_PASSWORD: ${DB_PASSWORD}
+      DB_NAME: oracle8
+      JWT_SECRET: ${JWT_SECRET:?Définis JWT_SECRET dans le fichier .env}
+      CORS_ORIGIN: http://localhost:8080
+      LIMITE_TENTATIVES: ${LIMITE_TENTATIVES:-10}
+      # Compte admin créé au démarrage s'il n'existe pas (facultatif)
+      ADMIN_PSEUDO: ${ADMIN_PSEUDO:-}
+      ADMIN_MOTDEPASSE: ${ADMIN_MOTDEPASSE:-}
+    ports:
+      - "3000:3000" # port de ta machine : port du conteneur
+    depends_on:
+      db:
+        condition: service_healthy # démarre seulement quand la base répond
+    restart: unless-stopped
+
+  # ---------- Frontend (site) ----------
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        # Adresse du backend vue par le NAVIGATEUR (donc localhost:3000, pas "backend")
+        VITE_API_URL: http://localhost:3000
+    ports:
+      - "8080:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  donnees-mysql:

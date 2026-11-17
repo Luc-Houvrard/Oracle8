@@ -1,4 +1,6 @@
 USE oracle8;
+-- Ce fichier est en UTF-8 : sans cette ligne, les accents peuvent être lus de travers
+SET NAMES utf8mb4;
 
 INSERT INTO reponse (texte) VALUES
 ('Oui, absolument.'),

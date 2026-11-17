@@ -1,0 +1,6 @@
+# Fichiers que Docker ne copie JAMAIS dans le conteneur
+node_modules
+dist
+test
+# Les secrets ne doivent pas finir dans l'image : ils seront donnés par docker-compose.yml
+.env
