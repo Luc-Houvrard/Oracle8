@@ -2,3 +2,5 @@ node_modules/
 dist/
 .env
 coverage/
+# Sauvegardes de la base : elles contiennent les mots de passe hachés
+sauvegarde-*.sql
