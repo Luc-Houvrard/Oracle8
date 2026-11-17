@@ -112,7 +112,7 @@ function Admin({ apiUrl, token, monPseudo }: Props) {
           onChange={(e) => setNouveau(e.target.value)}
           placeholder="Nouvelle réponse"
           aria-label="Nouvelle réponse"
-          maxLength={200}
+          maxLength={40}
           required
         />
         <button type="submit">Ajouter</button>
@@ -128,7 +128,7 @@ function Admin({ apiUrl, token, monPseudo }: Props) {
               type="text"
               defaultValue={r.texte}
               aria-label={`Réponse ${r.Id_Reponse}`}
-              maxLength={200}
+              maxLength={40}
               onBlur={(e) => modifier(r, e.currentTarget)}
               onKeyDown={(e) => {
                 if (e.key === "Enter") e.currentTarget.blur();

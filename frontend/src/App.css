@@ -339,3 +339,11 @@ kbd {
 .danger {
   background: #c0392b;
 }
+
+/* ---------- Historique ---------- */
+/* Largeur bornée, et un mot très long passe à la ligne au lieu de déborder */
+.historique {
+  width: 100%;
+  max-width: 640px;
+  overflow-wrap: anywhere;
+}

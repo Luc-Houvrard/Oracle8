@@ -174,7 +174,7 @@ Limites des champs (au-delà, l'API répond `400`) :
 - `pseudo` : 1 à 50 caractères
 - `motdepasse` : 8 caractères minimum, 72 octets maximum
 - `texte` d'une question : 1 à 500 caractères
-- `texte` d'une réponse : 1 à 200 caractères
+- `texte` d'une réponse : 1 à 40 caractères (au-delà, le texte déborde de la boule)
 
 ## 🗄️ Modèle de données
 

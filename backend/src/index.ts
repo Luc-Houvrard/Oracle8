@@ -269,13 +269,14 @@ function lireId(v: unknown): number | null {
 }
 
 const TEXTE_REPONSE_INVALIDE = {
-  erreur: "La réponse doit faire entre 1 et 200 caractères",
+  erreur: "La réponse doit faire entre 1 et 40 caractères",
 };
 
 // Ajouter une réponse
 app.post("/api/admin/reponses", async (req, res) => {
   const { texte } = req.body ?? {};
-  if (!estTexte(texte, 200)) {
+  // 40 caractères : au-delà, le texte déborde de la fenêtre de la boule
+  if (!estTexte(texte, 40)) {
     return res.status(400).json(TEXTE_REPONSE_INVALIDE);
   }
 
@@ -298,7 +299,8 @@ app.put("/api/admin/reponses/:id", async (req, res) => {
   if (!id) {
     return res.status(400).json({ erreur: "Identifiant invalide" });
   }
-  if (!estTexte(texte, 200)) {
+  // 40 caractères : au-delà, le texte déborde de la fenêtre de la boule
+  if (!estTexte(texte, 40)) {
     return res.status(400).json(TEXTE_REPONSE_INVALIDE);
   }
 
