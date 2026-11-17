@@ -393,6 +393,37 @@ app.delete("/api/admin/utilisateurs/:id", async (req: AuthRequest, res) => {
   }
 });
 
+// ---------- Compte admin créé au démarrage ----------
+// Si ADMIN_PSEUDO et ADMIN_MOTDEPASSE sont définis, crée ce compte admin
+// s'il n'existe pas encore. Un compte existant n'est JAMAIS modifié : sinon,
+// quelqu'un qui s'inscrirait avant toi avec ce pseudo deviendrait admin.
+async function creerAdminParDefaut() {
+  const pseudo = process.env.ADMIN_PSEUDO;
+  const motdepasse = process.env.ADMIN_MOTDEPASSE;
+  if (!pseudo || !motdepasse) return;
+
+  if (!estTexte(pseudo, 50) || motdepasse.length < 8) {
+    console.error(
+      "ADMIN_PSEUDO (1 à 50 caractères) ou ADMIN_MOTDEPASSE (8 caractères min.) invalide : compte admin non créé",
+    );
+    return;
+  }
+
+  const hash = await bcrypt.hash(motdepasse, 10);
+  // INSERT IGNORE : si le pseudo existe déjà, MySQL n'insère rien et ne renvoie pas d'erreur
+  const [result]: any = await pool.query(
+    "INSERT IGNORE INTO utilisateur (pseudo, motdepasse, role) VALUES (?, ?, 'admin')",
+    [pseudo, hash],
+  );
+  if (result.affectedRows === 1) {
+    console.log(`Compte admin « ${pseudo} » créé`);
+  }
+}
+
+creerAdminParDefaut().catch((err) => {
+  console.error("Création du compte admin impossible :", err.message);
+});
+
 // Toujours à la fin du fichier
 const PORT = Number(process.env.PORT) || 3000;
 app.listen(PORT, () => {

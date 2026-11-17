@@ -113,6 +113,7 @@ cp .env.example .env
 | `PORT` | Port du backend | `3000` |
 | `CORS_ORIGIN` | Adresse du frontend autorisée, sans `/` final | `http://localhost:5173` |
 | `LIMITE_TENTATIVES` | Tentatives par quart d'heure et par IP (mettre `1000` pour les tests) | `10` |
+| `ADMIN_PSEUDO`, `ADMIN_MOTDEPASSE` | Compte admin créé au démarrage s'il n'existe pas (un compte existant n'est jamais modifié) | aucun |
 
 Le backend ne lit `.env` qu'au démarrage : redémarre-le après chaque modification.
 
