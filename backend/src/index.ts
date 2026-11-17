@@ -13,6 +13,12 @@ if (!JWT_SECRET) {
 }
 
 const app = express();
+
+// Derrière un proxy HTTPS, l'adresse IP du visiteur arrive dans l'en-tête
+// X-Forwarded-For. TRUST_PROXY = nombre de proxys auxquels on fait confiance.
+if (process.env.TRUST_PROXY) {
+  app.set("trust proxy", Number(process.env.TRUST_PROXY));
+}
 // Adresse du frontend autorisée à appeler l'API (à changer en production)
 app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:5173" }));
 app.use(express.json());
@@ -42,7 +48,7 @@ function verifierToken(req: AuthRequest, res: Response, next: NextFunction) {
 // ---------- Limite de tentatives (par adresse IP) ----------
 // ponytail: compteurs en mémoire, remis à zéro au redémarrage et propres à un seul
 // processus. Passer à un store partagé (Redis) si le serveur tourne en plusieurs instances.
-// Derrière un reverse proxy, régler aussi app.set("trust proxy", ...) pour voir la vraie IP.
+// Derrière un proxy HTTPS, définir TRUST_PROXY (voir plus haut) pour voir la vraie IP.
 const QUINZE_MINUTES = 15 * 60 * 1000;
 const tropDeTentatives = {
   erreur: "Trop de tentatives. Réessaie dans quelques minutes.",

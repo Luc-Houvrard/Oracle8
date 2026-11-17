@@ -52,7 +52,20 @@ Oracle8/
 - MySQL (ou WAMP, XAMPP, etc.)
 - Git
 
-## 🚀 Installation
+## 🐳 Lancement rapide avec Docker
+
+Une seule commande lance la base, le backend et le frontend :
+
+```bash
+cp .env.example .env      # puis remplis DB_PASSWORD et JWT_SECRET
+sudo docker compose up -d --build
+```
+
+Ouvre ensuite http://localhost:8080. Pour mettre l'application en ligne sur un serveur (HTTPS, sauvegardes, mises à jour), voir [`docs/deploiement.md`](docs/deploiement.md).
+
+Les tests tournent automatiquement sur GitHub à chaque push (onglet **Actions**), et en local avec `cd backend && npm test` (voir [`backend/test/README.md`](backend/test/README.md)).
+
+## 🚀 Installation sans Docker
 
 ### 1. Cloner le projet
 

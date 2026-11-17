@@ -43,13 +43,19 @@ services:
       DB_PASSWORD: ${DB_PASSWORD}
       DB_NAME: oracle8
       JWT_SECRET: ${JWT_SECRET:?Définis JWT_SECRET dans le fichier .env}
-      CORS_ORIGIN: http://localhost:8080
+      # Adresse du site autorisée à appeler l'API (en production : https://ton-domaine)
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:8080}
       LIMITE_TENTATIVES: ${LIMITE_TENTATIVES:-10}
+      # Nombre de proxys devant le backend (1 derrière Caddy/nginx en production, vide en local)
+      TRUST_PROXY: ${TRUST_PROXY:-}
       # Compte admin créé au démarrage s'il n'existe pas (facultatif)
       ADMIN_PSEUDO: ${ADMIN_PSEUDO:-}
       ADMIN_MOTDEPASSE: ${ADMIN_MOTDEPASSE:-}
     ports:
-      - "3000:3000" # port de ta machine : port du conteneur
+      # port de ta machine : port du conteneur.
+      # 127.0.0.1 = joignable seulement depuis la machine elle-même (Docker contourne
+      # le pare-feu : sans ça, le port serait ouvert à tout Internet sur un serveur)
+      - "127.0.0.1:3000:3000"
     depends_on:
       db:
         condition: service_healthy # démarre seulement quand la base répond
@@ -60,10 +66,11 @@ services:
     build:
       context: ./frontend
       args:
-        # Adresse du backend vue par le NAVIGATEUR (donc localhost:3000, pas "backend")
-        VITE_API_URL: http://localhost:3000
+        # Adresse du backend vue par le NAVIGATEUR (donc localhost:3000, pas "backend").
+        # En production : https://api.ton-domaine
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3000}
     ports:
-      - "8080:80"
+      - "127.0.0.1:8080:80"
     depends_on:
       - backend
     restart: unless-stopped
