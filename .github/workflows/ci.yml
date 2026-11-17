@@ -1,0 +1,66 @@
+# Intégration continue (CI) d'Oracle8.
+# GitHub exécute ce fichier tout seul, sur un de ses serveurs, à chaque push.
+# Résultat visible dans l'onglet "Actions" du dépôt : ✅ ou ❌.
+
+name: CI
+
+# Quand lancer la CI : à chaque push (toutes les branches) et à chaque pull request
+on: [push, pull_request]
+
+jobs:
+  tests:
+    # Un serveur Linux neuf, fourni par GitHub, effacé à la fin
+    runs-on: ubuntu-latest
+    # Sécurité : si quelque chose bloque, on arrête au bout de 15 minutes
+    timeout-minutes: 15
+
+    # Les étapes s'exécutent dans l'ordre. Si une étape échoue, la CI s'arrête en ❌.
+    steps:
+      # 1. Récupérer le code du dépôt sur le serveur
+      - name: Récupérer le code
+        uses: actions/checkout@v4
+
+      # 2. Créer le .env que lit docker-compose.yml.
+      #    Ce sont des valeurs de TEST, jetables : pas de vrais secrets ici.
+      #    JWT_SECRET est tiré au hasard à chaque exécution.
+      #    LIMITE_TENTATIVES=1000 pour que les tests ne soient pas bloqués en 429.
+      - name: Créer le fichier .env de test
+        run: |
+          cat > .env <<EOF
+          DB_PASSWORD=mot-de-passe-de-ci
+          JWT_SECRET=$(openssl rand -hex 32)
+          LIMITE_TENTATIVES=1000
+          EOF
+
+      # 3. Construire et lancer toute l'application, exactement comme en local.
+      #    La construction du frontend vérifie aussi les types TypeScript (tsc -b).
+      - name: Lancer l'application avec Docker Compose
+        run: docker compose up -d --build
+
+      # 4. Attendre que le backend réponde (la base met quelques secondes à démarrer)
+      - name: Attendre que le backend soit prêt
+        run: curl --silent --fail --retry 30 --retry-all-errors --retry-delay 2 http://localhost:3000/api/health
+
+      # 5. Installer Node.js et les outils de test (tsx), puis lancer les tests
+      - name: Installer Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Installer les dépendances du backend
+        working-directory: backend
+        run: npm ci
+
+      - name: Lancer les tests
+        working-directory: backend
+        run: npm test
+
+      # 6. En cas d'échec seulement : afficher les journaux des conteneurs pour comprendre
+      - name: Afficher les journaux Docker
+        if: failure()
+        run: docker compose logs
+
+      # 7. Toujours, même en cas d'échec : tout arrêter et supprimer la base de test
+      - name: Arrêter l'application
+        if: always()
+        run: docker compose down -v
