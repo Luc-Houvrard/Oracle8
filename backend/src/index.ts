@@ -13,7 +13,8 @@ if (!JWT_SECRET) {
 }
 
 const app = express();
-app.use(cors({ origin: "http://localhost:5173" }));
+// Adresse du frontend autorisée à appeler l'API (à changer en production)
+app.use(cors({ origin: process.env.CORS_ORIGIN || "http://localhost:5173" }));
 app.use(express.json());
 
 // ---------- Middleware d'authentification ----------
@@ -50,7 +51,7 @@ const tropDeTentatives = {
 // Connexion : 10 échecs maximum par quart d'heure (les connexions réussies ne comptent pas)
 const limiteLogin = rateLimit({
   windowMs: QUINZE_MINUTES,
-  limit: 10,
+  limit: Number(process.env.LIMITE_TENTATIVES) || 10,
   skipSuccessfulRequests: true,
   message: tropDeTentatives,
 });
@@ -58,7 +59,7 @@ const limiteLogin = rateLimit({
 // Inscription : 10 demandes maximum par quart d'heure
 const limiteRegister = rateLimit({
   windowMs: QUINZE_MINUTES,
-  limit: 10,
+  limit: Number(process.env.LIMITE_TENTATIVES) || 10,
   message: tropDeTentatives,
 });
 

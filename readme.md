@@ -100,15 +100,21 @@ cd backend
 npm install
 ```
 
-Crée un fichier `backend/.env` :
+Crée le fichier `backend/.env` à partir du modèle, puis remplis au moins `JWT_SECRET` (la commande pour le générer est dans le fichier) :
 
-```env
-DB_HOST=localhost
-DB_USER=root
-DB_PASSWORD=
-DB_NAME=oracle8
-JWT_SECRET=une_longue_chaine_secrete_aleatoire
+```bash
+cp .env.example .env
 ```
+
+| Variable | Rôle | Par défaut |
+|---|---|---|
+| `DB_HOST`, `DB_USER`, `DB_PASSWORD`, `DB_NAME` | Connexion à MySQL | — |
+| `JWT_SECRET` | Clé qui signe les tokens (**obligatoire**, secrète) | — |
+| `PORT` | Port du backend | `3000` |
+| `CORS_ORIGIN` | Adresse du frontend autorisée, sans `/` final | `http://localhost:5173` |
+| `LIMITE_TENTATIVES` | Tentatives par quart d'heure et par IP (mettre `1000` pour les tests) | `10` |
+
+Le backend ne lit `.env` qu'au démarrage : redémarre-le après chaque modification.
 
 Lance le serveur :
 
@@ -119,6 +125,8 @@ npm run dev
 Le serveur tourne sur http://localhost:3000. Tu peux le vérifier sur http://localhost:3000/api/health.
 
 ### 4. Frontend
+
+Le frontend appelle le backend sur `http://localhost:3000`. Pour une autre adresse, copie `frontend/.env.example` en `frontend/.env` et change `VITE_API_URL`. Cette valeur est visible par tous les visiteurs : jamais de secret dedans.
 
 Dans un autre terminal :
 

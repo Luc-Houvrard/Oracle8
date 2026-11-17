@@ -2,7 +2,8 @@ import { useState, useEffect, useRef } from "react";
 import Admin from "./Admin";
 import "./App.css";
 
-const API_URL = "http://localhost:3000";
+// Adresse du backend. Lue au moment du build : jamais de secret dans une variable VITE_
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3000";
 
 interface Historique {
   Id_question: number;
