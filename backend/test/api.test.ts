@@ -6,43 +6,9 @@ import assert from "node:assert/strict";
 
 const API = process.env.API_URL ?? "http://localhost:3000/api";
 
-// Un test = 3 étapes : préparer, agir, vérifier.
-test("GET /health répond ok", async () => {
-  // Agir : on envoie la requête
-  const res = await fetch(`${API}/health`);
+// ---------- Compte de test partagé ----------
 
-  // Vérifier : le code HTTP et le contenu sont ceux attendus
-  assert.equal(res.status, 200);
-  assert.deepEqual(await res.json(), { status: "ok" });
-});
-
-
-test("POST /login avec un mauvais mot de passe renvoie 401", async () => {
-    // Agir : on envoie de faux identifiants
-    const res = await fetch(`${API}/login`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ pseudo: "test2", motdepasse: "mitdepasse123" }),
-    });
-
-    // Vérifier : la connexion est refusée
-    assert.equal(res.status, 401);
-  });
-
-test("POST inscription avec un pseudo et mot de passe valide", async () => {
-
-  const res = await fetch(`${API}/register`,{
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({pseudo: `test_${Date.now()}`, motdepasse: "motdepasse3"}),
-  });
-
-  assert.equal(res.status, 201);
-});
-
-// ---------- Tests avec un utilisateur connecté ----------
-
-// Un seul compte pour tous les tests suivants : chaque inscription compte
+// Un seul compte pour tous les tests qui en ont besoin : chaque inscription compte
 // dans la limite de tentatives (10 par quart d'heure)
 const pseudo = `test_${Date.now()}`;
 const motdepasse = "motdepasse123";
@@ -64,10 +30,41 @@ async function connexion(): Promise<string> {
   return (await res.json()).token;
 }
 
-// Préparer : exécuté une seule fois, avant les tests de cette partie
+// Préparer : exécuté une seule fois, avant tous les tests du fichier
 before(async () => {
   const res = await appeler("POST", "/register", { pseudo, motdepasse });
   assert.equal(res.status, 201, "l'inscription du compte de test a échoué");
+});
+
+// ---------- Tests ----------
+
+// Un test = 3 étapes : préparer, agir, vérifier.
+test("GET /health répond ok", async () => {
+  // Agir : on envoie la requête
+  const res = await fetch(`${API}/health`);
+
+  // Vérifier : le code HTTP et le contenu sont ceux attendus
+  assert.equal(res.status, 200);
+  assert.deepEqual(await res.json(), { status: "ok" });
+});
+
+test("POST /login avec un mauvais mot de passe renvoie 401", async () => {
+  // Agir : le compte de test existe, mais le mot de passe est faux
+  const res = await appeler("POST", "/login", { pseudo, motdepasse: "mauvais-mdp" });
+
+  // Vérifier : la connexion est refusée
+  assert.equal(res.status, 401);
+});
+
+test("POST inscription avec un pseudo et mot de passe valide", async () => {
+
+  const res = await fetch(`${API}/register`,{
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({pseudo: `test_${Date.now()}`, motdepasse: "motdepasse3"}),
+  });
+
+  assert.equal(res.status, 201);
 });
 
 test("POST /login avec les bons identifiants renvoie 200 et un token", async () => {

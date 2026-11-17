@@ -107,7 +107,7 @@ Ligne par ligne :
 | # | Ce qu'on vérifie | Requête | Résultat attendu | Pourquoi c'est important |
 |---|---|---|---|---|
 | 1 | Le serveur répond | `GET /api/health` | `200`, `{ status: "ok" }` | Si ce test échoue, le serveur est arrêté : inutile de chercher plus loin. |
-| 2 | Un mauvais mot de passe est refusé | `POST /api/login` (compte `test2`, faux mot de passe) | `401` | Sécurité : personne ne doit entrer dans un compte sans le bon mot de passe. |
+| 2 | Un mauvais mot de passe est refusé | `POST /api/login` (compte de test partagé, faux mot de passe) | `401` | Sécurité : personne ne doit entrer dans un compte sans le bon mot de passe. |
 | 3 | L'inscription fonctionne | `POST /api/register` (pseudo unique) | `201` | Sans inscription, personne ne peut utiliser l'application. |
 | 4 | La connexion fonctionne | `POST /api/login` (bons identifiants) | `200`, un `token`, le bon `pseudo` | Le token est indispensable pour toutes les routes protégées. |
 | 5 | On ne pose pas de question sans être connecté | `POST /api/questions` sans token | `401` | Sécurité : la route est bien protégée. |
@@ -115,9 +115,9 @@ Ligne par ligne :
 | 7 | L'historique fonctionne | `POST` puis `GET /api/questions` | `200`, la question posée en premier | L'utilisateur retrouve bien ses questions, de la plus récente à la plus ancienne. |
 | 8 | Un compte normal n'accède pas à l'admin | `GET /api/admin/utilisateurs` avec un token `user` | `403` | Sécurité : seuls les administrateurs gèrent les comptes et les réponses. |
 
-Les tests 1 à 3 sont écrits « à la main » avec `fetch`. Les tests 4 à 8 utilisent les fonctions utilitaires décrites ci-dessous.
+Les tests 1 et 3 sont écrits « à la main » avec `fetch`. Les autres utilisent les fonctions utilitaires décrites ci-dessous.
 
-## 6. Les fonctions utilitaires (tests 4 à 8)
+## 6. Les fonctions utilitaires
 
 ### Un compte partagé
 
@@ -128,7 +128,7 @@ const motdepasse = "motdepasse123";
 
 `Date.now()` renvoie le nombre de millisecondes écoulées depuis 1970 : un nombre différent à chaque lancement. Le pseudo est donc unique, et l'inscription ne tombe jamais sur « pseudo déjà pris ».
 
-Un seul compte sert aux 5 tests, au lieu d'un compte par test : chaque inscription compte dans la limite de tentatives (10 par quart d'heure).
+Un seul compte sert à tous ces tests, au lieu d'un compte par test : chaque inscription compte dans la limite de tentatives (10 par quart d'heure).
 
 ### `appeler()` : envoyer une requête
 
@@ -161,14 +161,14 @@ before(async () => {
 });
 ```
 
-`before()` s'exécute **une seule fois, avant les tests**. Il crée le compte partagé. Si l'inscription échoue, le message `"l'inscription du compte de test a échoué"` s'affiche : on sait tout de suite que le problème vient de la préparation, pas du test lui-même.
+`before()` s'exécute **une seule fois, avant tous les tests du fichier**, même s'il est écrit après certains d'entre eux. Il crée le compte partagé. Si l'inscription échoue, le message `"l'inscription du compte de test a échoué"` s'affiche : on sait tout de suite que le problème vient de la préparation, pas du test lui-même.
 
 ### Pourquoi ne pas utiliser un compte qui existe déjà ?
 
 1. On ne peut pas connaître son mot de passe : la base ne stocke qu'un hash bcrypt, et aucune route ne le renvoie.
 2. Un test doit fonctionner sur une **base vide** : sur ta machine, sur celle du jury, ou dans l'intégration continue. S'il dépend de données déjà présentes, il échoue dès que la base change.
 
-Le test 2 dépend encore du compte `test2` : il échouera sur une base neuve. Il faudra le faire utiliser le compte partagé.
+C'est pour ça que le test 2 utilise le compte partagé, et pas un compte comme `test2` : sur une base neuve (celle de la CI, par exemple), `test2` n'existe pas, et le test vérifierait « pseudo inconnu » au lieu de « mauvais mot de passe ».
 
 ## 7. Erreurs rencontrées en écrivant les tests
 
@@ -185,4 +185,3 @@ Le test 2 dépend encore du compte `test2` : il échouera sur une base neuve. Il
 - **Les tests demandent un backend et une base qui tournent.** Ce sont des tests d'intégration : ils testent l'ensemble API + base de données, pas une fonction isolée.
 - **Chaque lancement crée 2 comptes `test_...`** et quelques questions dans la base. On peut les supprimer depuis la page d'administration.
 - **Blocage `429` possible** après environ 5 lancements en 15 minutes, tant que la variable `LIMITE_TENTATIVES` n'est pas en place.
-- **Le test 2 dépend du compte `test2`** (voir section 6).
