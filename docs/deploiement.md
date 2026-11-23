@@ -128,7 +128,6 @@ Caddy obtient tout seul les certificats HTTPS auprès de Let's Encrypt, et les r
    Réponse attendue : `{"status":"ok"}`.
 3. **Le site** : ouvre `https://oracle8.exemple.fr`, connecte-toi avec le compte admin, pose une question, puis ouvre l'administration.
 
-Ne lance pas `npm test` contre la production : les tests créent des comptes `test_...` dans la base. Les tests tournent déjà dans l'intégration continue (onglet **Actions** sur GitHub) avant chaque déploiement.
 
 En cas de problème, les journaux :
 
