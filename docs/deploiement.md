@@ -22,12 +22,12 @@ Les 3 conteneurs sont décrits dans `docker-compose.yml`. Caddy est installé di
 
 ## 2. Prérequis
 
-- **Un serveur Linux** (Ubuntu 24.04 ou Debian 12), avec un accès SSH et `sudo`. 1 Go de RAM suffit.
-- **Un nom de domaine**, avec deux enregistrements DNS de type `A` qui pointent vers l'adresse IP du serveur :
+- **Un serveur Linux** (Ubuntu 24.04 ou Debian 12), avec un accès SSH et `sudo`.
+- **Un nom de domaine**qui pointent vers l'adresse IP du serveur :
   - `oracle8.exemple.fr` pour le site ;
   - `api.oracle8.exemple.fr` pour l'API.
 
-  Remplace `oracle8.exemple.fr` par ton domaine partout dans ce document.
+  
 - **Docker** et **Docker Compose** sur le serveur :
   ```bash
   curl -fsSL https://get.docker.com | sudo sh
