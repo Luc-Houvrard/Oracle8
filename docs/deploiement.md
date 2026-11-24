@@ -23,7 +23,7 @@ Les 3 conteneurs sont décrits dans `docker-compose.yml`. Caddy est installé di
 ## 2. Prérequis
 
 - **Un serveur Linux** (Ubuntu 24.04 ou Debian 12), avec un accès SSH et `sudo`.
-- **Un nom de domaine**qui pointent vers l'adresse IP du serveur :
+- **Un nom de domaine** qui pointent vers l'adresse IP du serveur :
   - `oracle8.exemple.fr` pour le site ;
   - `api.oracle8.exemple.fr` pour l'API.
 
