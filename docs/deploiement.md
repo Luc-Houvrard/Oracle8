@@ -2,7 +2,7 @@
 
 Ce document explique comment mettre Oracle8 en ligne sur un serveur, le mettre à jour, le sauvegarder et revenir en arrière en cas de problème.
 
-> **État** : la configuration Docker et la procédure locale sont testées (sur un poste de développement et dans l'intégration continue). La sauvegarde et la restauration (section 6) ont été testées le 17/11/2026 : une donnée ajoutée après la sauvegarde a bien disparu à la restauration, accents intacts. La partie serveur (sections 2 à 4 : domaine, HTTPS) n'a pas encore été déroulée sur un vrai serveur.
+> **État** : la configuration Docker et la procédure locale sont testées (sur un poste de développement et dans l'intégration continue). La sauvegarde et la restauration (section 6) ont été testées le 17/11/2026 : une donnée ajoutée après la sauvegarde a bien disparu à la restauration, accents intacts.
 
 ## 1. Vue d'ensemble
 
